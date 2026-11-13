@@ -9,12 +9,12 @@ command -v go >/dev/null 2>&1 || {
 
 case "${1:-build}" in
   test)
-    GOTOOLCHAIN=local go test ./...
-    GOTOOLCHAIN=local go vet ./...
+    GOTOOLCHAIN=auto go test ./...
+    GOTOOLCHAIN=auto go vet ./...
     ;;
   build)
     mkdir -p build
-    CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -ldflags="-s -w" -o build/discord-golive-bypass .
+    CGO_ENABLED=0 GOTOOLCHAIN=auto go build -trimpath -ldflags="-s -w" -o build/discord-golive-bypass .
     echo "Compilado: $PWD/build/discord-golive-bypass"
     ;;
   *)
