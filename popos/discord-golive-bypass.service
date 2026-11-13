@@ -1,0 +1,25 @@
+[Unit]
+Description=Discord Go Live Bypass (Pop!_OS)
+Documentation=https://github.com/tercioLustosa/discord-golive-bypass-linux-PopOS
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/discord-golive-bypass/settings
+ExecStart=/usr/local/libexec/discord-golive-bypass --config /etc/discord-golive-bypass/wireguard.conf --home ${DISCORD_HOME} --mode ${MODE}
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target
