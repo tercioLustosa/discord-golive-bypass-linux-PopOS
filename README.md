@@ -1,154 +1,270 @@
-# Discord Go Live Bypass — Linux
+# Discord Go Live Bypass — Pop!_OS 24.04
 
-Adaptação para **Fedora 45** do [DiscordGoLiveBypass](https://github.com/thomassolcia/DiscordGoLiveBypass), com WireGuard nativo do Linux e inicialização automática pelo systemd.
+Projeto Linux dedicado exclusivamente ao **Pop!_OS 24.04 LTS**. Usa WireGuard do kernel, rotas seletivas por IP e um serviço systemd para encaminhar destinos do Discord por uma VPN com saída fora do Brasil.
 
-Encaminha os destinos necessários do Discord por uma VPN fora do Brasil. No modo padrão, acompanha os logs do cliente para incluir as conexões de transmissão de tela no túnel. O roteamento usa endereços IP e também pode afetar outros aplicativos que acessam os mesmos destinos.
+> **Atenção:** este projeto não faz isolamento por processo. As rotas são aplicadas a endereços IP; outros aplicativos que acessarem os mesmos IPs também poderão usar a VPN. Leia as limitações antes de instalar.
 
-O funcionamento foi confirmado pelo usuário no Fedora 45 com uma configuração WireGuard da Proton VPN gratuita. Outras distribuições Linux ainda não foram validadas; os comandos deste tutorial são para Fedora tradicional, como Workstation e KDE. Fedora Atomic/Kinoite/Silverblue requer outro fluxo de instalação de pacotes no host.
+## O que você precisa
 
-## 1. Instalar as dependências e compilar
+- Pop!_OS 24.04 LTS atualizado.
+- Discord instalado no computador (cliente nativo ou Flatpak estável para o modo `transmissao`).
+- Uma configuração WireGuard válida de uma VPN cujo servidor tenha saída fora do Brasil. O projeto não fornece VPN nem credenciais.
+- Conexão com a internet durante a instalação e a primeira compilação.
 
-Abra o terminal e execute como seu usuário habitual:
+## 1. Instalar todas as dependências
+
+Abra o Terminal e execute:
 
 ```bash
-sudo dnf install git golang wireguard-tools iproute
-git clone https://github.com/Leonardov31/discord-golive-bypass-linux.git
-cd discord-golive-bypass-linux
-./fedora/build.sh test
-./fedora/build.sh
+sudo apt update
+sudo apt install -y git golang-go wireguard-tools iproute2 ca-certificates
 ```
 
-O executável será criado em `build/discord-golive-bypass`. A compilação requer Go 1.23 ou superior e não depende de componentes do Windows.
+Para que serve cada pacote:
 
-## 2. Gerar o arquivo na Proton VPN gratuita
+| Pacote | Uso |
+|---|---|
+| `git` | Baixar e atualizar o código |
+| `golang-go` | Compilar e testar o programa |
+| `wireguard-tools` | Disponibilizar o comando `wg` |
+| `iproute2` | Disponibilizar o comando `ip`, usado nas rotas |
+| `ca-certificates` | Certificados para baixar o toolchain Go, se necessário |
 
-Você precisa de uma conta Proton VPN e de uma configuração WireGuard pessoal. Não precisa instalar o aplicativo Proton para usar esta ferramenta.
+O projeto requer Go 1.23 ou superior. O pacote do Pop!_OS 24.04 pode trazer uma versão anterior; os scripts usam `GOTOOLCHAIN=auto` para o próprio Go baixar a versão 1.23 indicada em `go.mod`. Por isso, mantenha acesso à internet durante a compilação.
 
-1. Acesse [account.protonvpn.com](https://account.protonvpn.com) e entre na sua conta gratuita.
-2. Abra **Downloads → WireGuard configuration** (Configuração WireGuard).
-3. Dê um nome à configuração, como `discord-fedora`.
-4. Em **Platform**, escolha **Linux**.
-5. Mantenha as opções padrão. No plano gratuito, a opção VPN disponível é **VPN Accelerator**.
-6. Escolha um servidor gratuito fora do Brasil, identificado como **FREE**, entre os disponíveis na conta.
-7. Clique em **Create** e, quando estiver pronto, em **Download**.
-8. Salve o arquivo baixado na pasta **Downloads** e **renomeie-o para `proton.conf`**.
+Confira as ferramentas:
 
-Esse procedimento segue as [instruções oficiais da Proton](https://protonvpn.com/support/wireguard-configurations). O arquivo deve ser WireGuard, com extensão `.conf`; arquivos OpenVPN `.ovpn` não servem.
+```bash
+go version
+wg --version
+ip -Version
+systemctl --version
+```
 
-**O arquivo contém sua chave privada. Não o publique no GitHub nem o envie em issues.** Este repositório ignora arquivos `.conf` e `.key` para reduzir o risco de inclusão acidental.
+## 2. Baixar o projeto e executar os testes
 
-Outra VPN que forneça uma configuração WireGuard de saída fora do Brasil também pode ser utilizada.
+Execute como usuário normal, sem `sudo`:
 
-## 3. Ativar e instalar o serviço
+```bash
+git clone https://github.com/tercioLustosa/discord-golive-bypass-linux-PopOS.git
+cd discord-golive-bypass-linux-PopOS
+./popos/build.sh test
+./popos/build.sh
+```
 
-Ainda dentro da pasta `discord-golive-bypass-linux`, confira se o arquivo foi salvo com o nome indicado:
+O primeiro comando de compilação pode baixar automaticamente o Go 1.23. Ao terminar, o executável deve existir em `build/discord-golive-bypass`.
+
+## 3. Obter uma configuração WireGuard
+
+Você precisa de um arquivo de configuração WireGuard de um provedor VPN com servidor de saída fora do Brasil. Este projeto não cria uma conta VPN nem gera chaves.
+
+Exemplo usando Proton VPN:
+
+1. Entre na sua conta no site oficial da Proton VPN.
+2. Abra a área de downloads/configurações WireGuard.
+3. Gere uma configuração para **Linux** e escolha um servidor disponível fora do Brasil.
+4. Baixe o arquivo de configuração WireGuard (`.conf`) e salve em `Downloads` com o nome `proton.conf`.
+
+Documentação do provedor: [Proton VPN — WireGuard configurations](https://protonvpn.com/support/wireguard-configurations).
+
+Você pode usar outro provedor, desde que forneça um arquivo WireGuard com saída IPv4 completa. O arquivo deve conter:
+
+- uma seção `[Interface]` com `PrivateKey` e `Address` IPv4;
+- uma seção `[Peer]` com `PublicKey`, `Endpoint` e `AllowedIPs = 0.0.0.0/0`;
+- se o endereço da interface incluir IPv6, `AllowedIPs` também deve incluir `::/0`.
+
+**Proteja esse arquivo:** ele contém sua chave privada. Não o envie para outras pessoas, não o publique no GitHub e não o coloque dentro da pasta do repositório. O instalador o copia para `/etc/discord-golive-bypass/wireguard.conf` com permissão restrita.
+
+Valide o caminho e a configuração antes de instalar:
 
 ```bash
 ls -l "$HOME/Downloads/proton.conf"
+./build/discord-golive-bypass --check --config "$HOME/Downloads/proton.conf" --home "$HOME"
 ```
 
-Se o arquivo aparecer, valide e instale:
+Se salvou com outro nome ou em outra pasta, substitua o caminho nos próximos comandos. Se a validação falhar, confira se baixou uma configuração WireGuard `.conf`, não um arquivo OpenVPN `.ovpn`.
+
+## 4. Instalar e ativar o serviço
+
+Na pasta do repositório, execute:
 
 ```bash
-./build/discord-golive-bypass --check --config "$HOME/Downloads/proton.conf" --home "$HOME"
-sudo ./fedora/install.sh "$HOME/Downloads/proton.conf" "$HOME"
+sudo ./popos/install.sh "$HOME/Downloads/proton.conf" "$HOME"
 ```
 
-Se sua pasta de downloads ou o nome do arquivo for diferente, ajuste o caminho nos comandos. `proton.conf` precisa ser o arquivo real que você baixou e renomeou. O erro **“não foi possível abrir a configuração”** significa que o programa não conseguiu ler o caminho informado.
+O instalador:
 
-O instalador pede a senha de administrador, copia a configuração para `/etc/discord-golive-bypass/wireguard.conf` com permissão `600`, instala o executável e habilita o serviço systemd. Não instala o Discord.
+1. confirma que o sistema é Pop!_OS 24.04;
+2. verifica as dependências e valida o arquivo WireGuard;
+3. instala o executável em `/usr/local/libexec/`;
+4. guarda a configuração VPN em `/etc/discord-golive-bypass/` com permissão `0600`;
+5. instala e habilita o serviço systemd;
+6. inicia o serviço imediatamente.
 
-Depois da instalação:
+O modo padrão é `transmissao`. Depois da instalação:
 
-1. Feche completamente o Discord, inclusive pela bandeja do sistema.
-2. Abra o Discord pelo atalho habitual.
-3. Entre novamente na chamada e teste a transmissão de tela.
+1. feche completamente o Discord (encerre também o processo na bandeja, se houver);
+2. abra o Discord novamente;
+3. entre novamente na chamada e inicie o Go Live.
 
-**Não é necessário executar o comando a cada reinicialização.** O serviço inicia automaticamente com o Fedora. No dia a dia, basta abrir o Discord. Uma chamada já aberta pode precisar ser encerrada e iniciada novamente após ativar ou trocar o modo.
+O serviço inicia automaticamente nas próximas inicializações do Pop!_OS. Não é necessário executar o instalador toda vez.
 
-## 4. Conferir, desativar e reativar
-
-Consultar o estado e os registros:
+## 5. Verificar se está funcionando
 
 ```bash
 systemctl status discord-golive-bypass --no-pager
 sudo journalctl -u discord-golive-bypass -n 80 --no-pager
+sudo wg show dglb0
+ip -4 route show dev dglb0
 ```
 
-Desativar agora e impedir o início automático:
+Depois que o túnel trocar dados, `wg show dglb0` deve apresentar um handshake recente. O journal mostra mensagens como `túnel ativo` e, quando detectada, a conexão da transmissão que entrou no túnel.
+
+Para confirmar uma rota específica:
+
+```bash
+ip -4 route get 162.159.128.1
+```
+
+O resultado deve indicar `dev dglb0` quando o IP consultado estiver entre os destinos roteados naquele modo. Isso verifica a rota local, não garante por si só que o Go Live esteja funcionando.
+
+## 6. Comandos para controlar o serviço
+
+Ver estado:
+
+```bash
+systemctl status discord-golive-bypass --no-pager
+```
+
+Parar temporariamente:
+
+```bash
+sudo systemctl stop discord-golive-bypass
+```
+
+Iniciar novamente:
+
+```bash
+sudo systemctl start discord-golive-bypass
+```
+
+Desabilitar também a inicialização automática:
 
 ```bash
 sudo systemctl disable --now discord-golive-bypass
 ```
 
-Reativar agora e nas próximas inicializações:
+Habilitar novamente:
 
 ```bash
 sudo systemctl enable --now discord-golive-bypass
 ```
 
-Para uma pausa temporária, use `sudo systemctl stop discord-golive-bypass`; para retomar, use `sudo systemctl start discord-golive-bypass`. Esses comandos não alteram a configuração de início automático.
+## 7. Modo completo (voz e câmera)
 
-## 5. Usar a câmera ou encaminhar mais tráfego do Discord
-
-O modo padrão é `transmissao`, voltado ao Go Live. Para incluir voz e câmera, edite:
+O modo padrão `transmissao` encaminha os destinos de controle do Discord e detecta os IPs de mídia das transmissões pelos logs do cliente. Para encaminhar também os destinos conhecidos de voz e câmera, altere o modo:
 
 ```bash
 sudoedit /etc/discord-golive-bypass/settings
 ```
 
-Altere somente a linha do modo para:
+Altere a linha para:
 
 ```ini
 MODE=completo
 ```
 
-Depois execute:
+Salve, reinicie o serviço e reabra o Discord:
 
 ```bash
 sudo systemctl restart discord-golive-bypass
 ```
 
-Feche e reabra o Discord e entre novamente na chamada. Para voltar, use `MODE=transmissao` e reinicie o serviço. O modo completo inclui os destinos conhecidos do Discord, pode aumentar a latência da voz e não isola tráfego por processo.
+Para voltar ao modo padrão, defina `MODE=transmissao` e reinicie o serviço. O modo completo pode aumentar a latência da chamada porque a voz também passa pelo servidor VPN.
 
-## 6. Atualizar o programa ou trocar de servidor
+## 8. Atualizar o programa
 
-Para atualizar o código e reinstalar, reutilizando a configuração já protegida:
+Entre na pasta do repositório e execute:
 
 ```bash
 git pull --ff-only
-./fedora/build.sh test
-./fedora/build.sh
-sudo ./fedora/install.sh /etc/discord-golive-bypass/wireguard.conf "$HOME"
+./popos/build.sh test
+./popos/build.sh
+sudo ./popos/install.sh /etc/discord-golive-bypass/wireguard.conf "$HOME"
 ```
 
-O instalador usa `transmissao` por padrão. Se quiser manter `completo`, acrescente `completo` ao final do último comando.
-
-Para trocar de servidor, gere e baixe uma nova configuração WireGuard, renomeie-a para `proton.conf` na pasta Downloads e repita o comando da etapa 3. Faça isso também se o arquivo expirar ou o servidor deixar de funcionar.
-
-## Limitações e diagnóstico
-
-- Não há interface gráfica nem login Proton integrado.
-- O modo transmissão depende dos logs do Discord nativo ou do Flatpak estável. Para navegador ou caminhos de log diferentes, use `completo`.
-- Os endereços e o formato dos logs do Discord podem mudar. Não há garantia de funcionamento para todas as versões, contas ou redes.
-- Se a VPN cair, os destinos selecionados podem ficar sem conexão até ela retornar ou o serviço ser desligado. Não há fallback automático de saúde nesta versão.
-- O campo `DNS` do arquivo não é aplicado: o resolvedor do sistema continua em uso. Os comandos embutidos em configurações WireGuard, como `PostUp`, são rejeitados.
-- Não altere firewalld ou desative SELinux para seguir este tutorial. Outras VPNs e regras de roteamento podem interferir.
-
-Veja [modos, caminhos de logs, diagnóstico, recuperação após falha e desinstalação](fedora/README.md).
-
-## Desenvolvimento e testes
+Se você usa `MODE=completo`, informe o modo no final do comando de instalação:
 
 ```bash
-go test ./...
-go vet ./...
-./fedora/build.sh
+sudo ./popos/install.sh /etc/discord-golive-bypass/wireguard.conf "$HOME" completo
 ```
 
-Os testes cobrem o núcleo de roteamento original, interpretação dos eventos de mídia, configurações inválidas, proteção do endpoint, falha parcial de aplicação de rotas, IPv6 e rotação/truncamento de logs. Há também um workflow de CI para testar e compilar no Linux. A instalação systemd e uma transmissão real precisam ser verificadas no computador de destino.
+## 9. Diagnóstico e recuperação
+
+Consultar os registros completos:
+
+```bash
+sudo journalctl -u discord-golive-bypass -b --no-pager
+```
+
+Verificar o túnel:
+
+```bash
+sudo wg show dglb0
+ip link show dglb0
+```
+
+Se aparecer que a interface `dglb0` já existe, não execute repetidamente o instalador. Primeiro confirme que o serviço está parado:
+
+```bash
+sudo systemctl stop discord-golive-bypass
+ip link show dglb0
+```
+
+Somente se tiver certeza de que a interface é uma sobra desta ferramenta e que nenhum outro serviço a utiliza, remova-a:
+
+```bash
+sudo ip link del dglb0
+sudo ip -6 route flush type unreachable metric 42760
+```
+
+Em seguida, inicie o serviço novamente:
+
+```bash
+sudo systemctl start discord-golive-bypass
+```
+
+Se o serviço não iniciar, envie a saída de `systemctl status` e `journalctl` para diagnóstico, mas **nunca envie o arquivo WireGuard**, pois contém sua chave privada.
+
+## 10. Desinstalar completamente
+
+Na pasta do repositório:
+
+```bash
+sudo ./popos/uninstall.sh
+```
+
+O script para e desabilita o serviço, remove o executável, apaga a configuração WireGuard protegida e recarrega o systemd. Ele não remove o Discord, o Git, o Go, o WireGuard do sistema nem o repositório baixado.
+
+## Limitações importantes
+
+- Compatibilidade alvo: **Pop!_OS 24.04 LTS**. Não há scripts de instalação para Fedora ou outras distribuições.
+- O modo `transmissao` lê os logs do Discord nativo e do Flatpak estável nos caminhos conhecidos. Se o Discord estiver em outro caminho, use `completo`.
+- O navegador não é monitorado pelo leitor de logs; para ele, use `completo`.
+- O roteamento é por IP, não por processo. Outros aplicativos que acessarem os mesmos endereços IP também podem usar o túnel.
+- O campo `DNS` da configuração WireGuard não é aplicado; o DNS atual do sistema continua em uso. Hooks como `PostUp` e `PreDown` são rejeitados por segurança.
+- Se a VPN cair, os destinos selecionados podem ficar sem conexão até o túnel voltar ou o serviço ser parado. Esta versão não possui fallback automático.
+- Atualizações do Discord podem mudar os endereços IP ou o formato dos logs. O funcionamento precisa ser testado após atualizações relevantes.
+
+## Desenvolvimento
+
+```bash
+./popos/build.sh test
+./popos/build.sh
+```
+
+A integração contínua testa e compila em Ubuntu 24.04, base de pacotes do Pop!_OS 24.04. Isso não substitui o teste de instalação e de uma transmissão real no Pop!_OS.
 
 ## Créditos e licença
 
-Derivado de [thomassolcia/DiscordGoLiveBypass](https://github.com/thomassolcia/DiscordGoLiveBypass), sob licença [GPL-3.0](LICENSE). O núcleo de rotas e de detecção de transmissões mantém o código do projeto original. Consulte [NOTICE.md](NOTICE.md) para o commit de origem e as modificações da edição Linux.
-
-Este projeto é independente e não é afiliado ao Discord ou à Proton.
+Derivado de [thomassolcia/DiscordGoLiveBypass](https://github.com/thomassolcia/DiscordGoLiveBypass), sob licença [GPL-3.0](LICENSE). Consulte [NOTICE.md](NOTICE.md) para os créditos e a origem do código. Projeto independente, sem afiliação com Discord ou Proton.
