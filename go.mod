@@ -1,3 +1,3 @@
-module github.com/Leonardov31/discord-golive-bypass-linux
+module github.com/tercioLustosa/discord-golive-bypass-linux-PopOS
 
 go 1.23
