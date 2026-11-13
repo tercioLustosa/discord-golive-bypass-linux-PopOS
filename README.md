@@ -248,7 +248,7 @@ O script para e desabilita o serviço, remove o executável, apaga a configuraç
 
 ## Limitações importantes
 
-- Compatibilidade alvo: **Pop!_OS 24.04 LTS**. Não há scripts de instalação para Fedora ou outras distribuições.
+- Compatibilidade alvo: **somente Pop!_OS 24.04 LTS**.
 - O modo `transmissao` lê os logs do Discord nativo e do Flatpak estável nos caminhos conhecidos. Se o Discord estiver em outro caminho, use `completo`.
 - O navegador não é monitorado pelo leitor de logs; para ele, use `completo`.
 - O roteamento é por IP, não por processo. Outros aplicativos que acessarem os mesmos endereços IP também podem usar o túnel.
