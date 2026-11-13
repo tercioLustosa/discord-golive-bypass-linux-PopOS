@@ -1,4 +1,4 @@
-name: Linux
+name: Pop!_OS 24.04
 
 on:
   push:
@@ -11,21 +11,25 @@ permissions:
 
 jobs:
   test-and-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.23.x'
           cache: false
-      - name: Testar e analisar
-        run: ./fedora/build.sh test
-      - name: Compilar Linux
-        run: ./fedora/build.sh
-      - name: Validar scripts
-        run: bash -n fedora/build.sh fedora/install.sh
+      - name: Testes e análise estática
+        run: |
+          GOTOOLCHAIN=local go test ./...
+          GOTOOLCHAIN=local go vet ./...
+      - name: Compilar
+        run: |
+          mkdir -p build
+          CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -o build/discord-golive-bypass .
+      - name: Validar scripts Pop!_OS
+        run: bash -n popos/build.sh popos/install.sh popos/uninstall.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: discord-golive-bypass-linux-amd64
+          name: discord-golive-bypass-popos-24.04-amd64
           path: build/discord-golive-bypass
